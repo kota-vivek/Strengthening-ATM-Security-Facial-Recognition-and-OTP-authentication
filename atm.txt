@@ -1,0 +1,88 @@
+import cv2
+import face_recognition
+import pyotp
+import getpass
+
+class ATM:
+    def __init__(self, card_number, face_image, otp_secret):
+        self.card_number = card_number
+        self.face_image = face_image
+        self.otp_secret = otp_secret
+        self.pin = None
+
+    def validate_face(self):
+        face_image = face_recognition.load_image_file(self.face_image)
+        face_encoding = face_recognition.face_encodings(face_image)[0]
+
+        unknown_image = cv2.VideoCapture(0)
+        unknown_face_encodings = []
+
+        while True:
+            ret, frame = unknown_image.read()
+            small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+            rgb_small_frame = small_frame[:, :, ::-1]
+
+            face_locations = face_recognition.face_locations(rgb_small_frame)
+            face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
+
+            for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
+                matches = face_recognition.compare_faces([self.face_encoding], face_encoding)
+
+                if True in matches:
+                    print("Face validation successful")
+                    return True
+
+            cv2.imshow('Video', frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+        unknown_image.release()
+        cv2.destroyAllWindows()
+
+        return False
+
+    def validate_otp(self):
+        otp = getpass.getpass("Enter OTP: ")
+        totp = pyotp.TOTP(self.otp_secret)
+
+        if totp.verify(otp):
+            print("OTP validation successful")
+            return True
+
+        print("OTP validation failed")
+        return False
+
+    def validate_pin(self):
+        pin = getpass.getpass("Enter PIN: ")
+
+        if pin == self.pin:
+            print("PIN validation successful")
+            return True
+
+        print("PIN validation failed")
+        return False
+
+    def process_transaction(self):
+        if not self.validate_face():
+            if not self.validate_otp():
+                return
+            else:
+                if not self.validate_pin():
+                    return
+        else:
+            if not self.validate_pin():
+                return
+
+        # Perform transaction here
+        print("Transaction successful")
+
+if __name__ == "__main__":
+    card_number = input("Enter card number: ")
+    face_image = input("Enter face image path: ")
+    otp_secret = input("Enter OTP secret: ")
+    pin = getpass.getpass("Enter PIN: ")
+
+    atm = ATM(card_number, face_image, otp_secret)
+    atm.pin = pin
+    atm.process_transaction()
